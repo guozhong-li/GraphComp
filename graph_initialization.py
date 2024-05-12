@@ -33,7 +33,7 @@ def graph_initialization(temperature_matrix, segments_fz):
 
 def main():
     # Example temperature matrix (replace with your data)
-    temperature_data = np.fromfile('/path/to/your/data/data', dtype=np.float32).reshape(num_timepoints, wide, length)
+    temperature_data = np.fromfile('/path/to/your/data', dtype=np.float32).reshape(num_timepoints, wide, length)
     print("temperature_data.shape: ", temperature_data.shape)
 
     # Different sets of parameters
