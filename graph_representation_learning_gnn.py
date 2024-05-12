@@ -111,7 +111,6 @@ def weighted_binary_cross_entropy(output, target, weight=None):
 
     return torch.neg(torch.mean(loss))
 
-
 def train(model, graphs, optimizer, device, epochs):
     model.train()
 
@@ -195,7 +194,7 @@ def view_graphs(graphs, reconstructed_graphs):
 
         print("\n")
 
-def generate_and_save_latent_representations(model, graphs, device, save_path):
+def generate_and_save_graph_embedding(model, graphs, device, save_path):
     model.eval() 
     latent_representations = []
 
@@ -230,7 +229,7 @@ def main():
             graphs = pickle.load(file)
         print("load graphs done.")
     else:
-        temperature_data = np.fromfile('/home/lig0d/compression/sample_t2.dat', dtype=np.float32).reshape(wide, length, -1)
+        temperature_data = np.fromfile('/path/to/your/data/', dtype=np.float32).reshape(wide, length, -1)
         print("temperature_data.shape: ", temperature_data.shape)
 
         graphs = [graph_initialization(data_matrix) for data_matrix in temperature_data]
@@ -264,7 +263,7 @@ def main():
         total_time = end_time - start_time
         print(f'Training done. Total time: {total_time:.2f} seconds')
 
-    generate_and_save_latent_representations(unsupervised_gnn_model, graphs, device, '/path/to/save/latent/')
+    generate_and_save_graph_embedding(unsupervised_gnn_model, graphs, device, '/path/to/save/latent/')
 
     reconstructed_graphs = reconstruct_graphs(unsupervised_gnn_model, normalized_graphs, device)
     denormalize_temperature(reconstructed_graphs, mean_temp, std_temp)
