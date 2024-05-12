@@ -27,7 +27,7 @@ def graph_initialization(temperature_matrix, segments_fz):
         
         # Assign the mean temperature to the corresponding node in the graph
         rag.nodes[region]['mean temperature'] = mean_temperature
-        # rag.nodes[region]['std_temperature'] = std_temperature
+        # rag.nodes[region]['std temperature'] = std_temperature
 
     return rag
 
