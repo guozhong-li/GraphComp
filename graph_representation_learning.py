@@ -38,16 +38,6 @@ def graph_initialization(temperature_matrix):
         # Assign the mean temperature to the corresponding node in the graph
         rag.nodes[region]['mean temperature'] = mean_temperature
 
-    # Define edge weights as absolute difference of mean temperatures
-    for edge in rag.edges:
-        source, target = edge
-        diff = np.abs(rag.nodes[source]['mean temperature'] - rag.nodes[target]['mean temperature'])
-
-        # Set edge weight to 0 if the temperature difference is below a certain threshold, otherwise set it to 1
-        weight = 0 if diff <= 0 else 1
-        
-        rag.edges[source, target]['weight'] = weight
-
     return rag
 
 def calculate_mean_std(train_graphs):
@@ -62,7 +52,6 @@ def normalize_temperature(train_graphs, mean_temp, std_temp):
         normalized_graph = graph.copy()
         for node, data in normalized_graph.nodes(data=True):
             data['mean temperature'] = (data['mean temperature'] - mean_temp) / std_temp
-            print('data[mean temperature]:', data['mean temperature'])
         normalized_graphs.append(normalized_graph)
     return normalized_graphs
 
@@ -77,14 +66,19 @@ class UnsupervisedGNNModel(MessagePassing):
         super(UnsupervisedGNNModel, self).__init__(aggr='mean')
         self.conv1 = self.build_conv(input_size, hidden_size)
         self.bn1 = BatchNorm(hidden_size)
+        # self.conv2 = self.build_conv(hidden_size, hidden_size)  # 第二个隐藏层
+        # self.bn2 = BatchNorm(hidden_size)
 
     def build_conv(self, in_channels, out_channels):
         return GCNConv(in_channels, out_channels)
 
-    def forward(self, x, edge_index, edge_attr):
+    def forward(self, x, edge_index):
         x = self.conv1(x, edge_index)
         x = self.bn1(x)
         x = F.relu(x)
+        # x = self.conv2(x, edge_index)
+        # x = self.bn2(x)
+        # x = F.relu(x)
 
         return x
 
@@ -100,8 +94,8 @@ class AutoEncoder(torch.nn.Module):
         self.encoder = UnsupervisedGNNModel(input_size, hidden_size, output_size)
         self.decoder = InnerProductDecoder()  # 使用内积解码器
 
-    def forward(self, x, edge_index, edge_attr=None):
-        encoded = self.encoder(x, edge_index, edge_attr)
+    def forward(self, x, edge_index):
+        encoded = self.encoder(x, edge_index)
         decoded = self.decoder(encoded)  # 使用内积解码器
         return decoded
 
@@ -131,9 +125,9 @@ def train(model, graphs, optimizer, device, epochs):
         for graph_data in graphs:
             x = torch.tensor([graph_data.nodes[node]['mean temperature'] for node in graph_data.nodes], dtype=torch.float32).view(-1, 1)
             edge_index = torch.tensor([[edge[0] for edge in graph_data.edges], [edge[1] for edge in graph_data.edges]], dtype=torch.long)
-            edge_attr = torch.tensor([graph_data.edges[edge]['weight'] for edge in graph_data.edges], dtype=torch.float32).view(-1, 1)
+            # edge_attr = torch.tensor([graph_data.edges[edge]['weight'] for edge in graph_data.edges], dtype=torch.float32).view(-1, 1)
 
-            data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
+            data = Data(x=x, edge_index=edge_index)
             data = data.to(device)
 
             # 获取邻接矩阵
@@ -141,12 +135,11 @@ def train(model, graphs, optimizer, device, epochs):
 
             # 训练模型
             optimizer.zero_grad()
-            encoded = model.encoder(data.x, data.edge_index, data.edge_attr)
+            encoded = model.encoder(data.x, data.edge_index)
             decoded_adjacency = model.decoder(encoded)  # 使用内积解码器
 
             # 计算内积解码损失
-            loss = weighted_binary_cross_entropy(decoded_adjacency, adjacency_matrix, weight=[1, 10])
-            # loss = ((decoded_adjacency - adjacency_matrix) ** 2).mean()
+            loss = ((decoded_adjacency - adjacency_matrix) ** 2).mean()
             loss.backward()
             optimizer.step()
 
@@ -166,7 +159,7 @@ def reconstruct_graphs(autoencoder, graphs, device):
             edge_index = torch.tensor([[edge[0] for edge in graph_data.edges], [edge[1] for edge in graph_data.edges]], dtype=torch.long)
             data = Data(x=x, edge_index=edge_index).to(device)
 
-            encoded = autoencoder.encoder(data.x, data.edge_index, data.edge_attr)
+            encoded = autoencoder.encoder(data.x, data.edge_index)
             decoded_adjacency = autoencoder.decoder(encoded)  # 使用内积解码器
 
             # 将解码后的输出转换为 NetworkX 图对象
@@ -184,6 +177,7 @@ def reconstruct_graphs(autoencoder, graphs, device):
             reconstructed_graphs.append(reconstructed_graph)
 
     return reconstructed_graphs
+
 
 def compare_graphs(original_rags, reconstructed_graphs):
     similarities = []
@@ -246,7 +240,7 @@ def compare_edge_consistency(original_rags, reconstructed_graphs):
     return consistency_results
 
 def view_graphs(graphs, reconstructed_graphs):
-    selected_indices = [0]  # 选择前三个图（根据需要更改索引）
+    selected_indices = [0, 10]  # 选择前三个图（根据需要更改索引）
 
     for i in selected_indices:
         original_graph = graphs[i]
@@ -278,29 +272,39 @@ def generate_and_save_latent_representations(model, graphs, device, save_path):
         for graph_data in graphs:
             x = torch.tensor([graph_data.nodes[node]['mean temperature'] for node in graph_data.nodes], dtype=torch.float32).view(-1, 1)
             edge_index = torch.tensor([[edge[0] for edge in graph_data.edges], [edge[1] for edge in graph_data.edges]], dtype=torch.long)
-            edge_attr = torch.tensor([graph_data.edges[edge]['weight'] for edge in graph_data.edges], dtype=torch.float32).view(-1, 1)
+            # edge_attr = torch.tensor([graph_data.edges[edge]['weight'] for edge in graph_data.edges], dtype=torch.float32).view(-1, 1)
 
-            data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
+            # data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
+            data = Data(x=x, edge_index=edge_index)
             data = data.to(device)
 
             # 获取编码器的潜在表示
-            latent_representation = model.encoder(data.x, data.edge_index, data.edge_attr)
+            # latent_representation = model.encoder(data.x, data.edge_index, data.edge_attr)
+            latent_representation = model.encoder(data.x, data.edge_index)
             latent_representations.append(latent_representation.cpu().numpy())
 
     # 保存潜在表示
-    # np.save(f"{save_path}/graph_latent_representations.npy", np.array(latent_representations))
-    with open(f"{save_path}/graph_s500s1m5000_latent_representations.pkl", 'wb') as file:
-        pickle.dump(latent_representations, file)
+    print("latent_representation.shape: ", latent_representation.shape)
+
+    # with open(f"{save_path}/rere_graph_s{scale}s{sigma}m{min_size}_latent_representations_t1seg.pkl", 'wb') as file:
+    #     pickle.dump(latent_representations, file)
+
+    latent_representations = np.array(latent_representations)
+
+    # 保存为 .dat 文件
+    with open(f"{save_path}/latent_representations_s{scale}_s{sigma}_m{min_size}.dat", 'wb') as file:
+        latent_representations.tofile(file)
 
     return latent_representations
 
-
 def main():
 
-    graphs_file_path = 'graph_scale500_sigma1_minsize5000.pkl'
-    # graphs_file_path =  're_graph_scale500_sigma1_minsize5000.pkl'
-    model_path = 'auto_gcn_1l_linear_t_5000_h16o16.pth'
-    reconstructed_graphs_file_path = 're_graph_scale500_sigma1_minsize5000.pkl'
+    graphs_file_path = f"graph_scale{scale}_sigma{sigma}_minsize{min_size}.pkl"
+    model_path = f"auto_ggl_s{scale}_s{sigma}_m{min_size}_h1o1.pkl"
+    reconstructed_graphs_file_path = f"re_graph_scale{scale}_sigma{sigma}_minsize{min_size}.pkl"
+    # graphs_file_path = f"re_graph_scale{scale}_sigma{sigma}_minsize{min_size}_t1seg.pkl"
+    # model_path = f"auto_ggl_s{scale}_s{sigma}_m{min_size}_h1o1_t1seg.pkl"
+    # reconstructed_graphs_file_path = f"re2_graph_scale{scale}_sigma{sigma}_minsize{min_size}_t1seg.pkl"
 
     # 检查是否存在保存的图数据文件
     if os.path.exists(graphs_file_path):
@@ -310,7 +314,7 @@ def main():
         print("load graphs done.")
     else:
         # 如果文件不存在，生成图数据
-        temperature_data = np.fromfile('/home/lig0d/compression/sample_t2.dat', dtype=np.float32).reshape(num_timepoints, wide, length)
+        temperature_data = np.fromfile('/home/lig0d/compression/sample_t2.dat', dtype=np.float32).reshape(wide, length, -1)
         print("temperature_data.shape: ", temperature_data.shape)
 
         # temperature_data = np.round(temperature_data, 2)
@@ -324,14 +328,12 @@ def main():
             pickle.dump(graphs, file)
     
     mean_temp, std_temp = calculate_mean_std(graphs)
-    print("mean_temp and std_temp: ", mean_temp, std_temp)
     normalized_graphs = normalize_temperature(graphs, mean_temp, std_temp)
-    # os._exit(-1)
 
     # 初始化无监督的图卷积神经网络模型
     input_size = 1  # 假设每个节点的特征是一个实数
-    hidden_size = 16
-    output_size = 16
+    hidden_size = 1
+    output_size = 1
 
     if os.path.exists(model_path):
         # 如果已经存在模型文件，直接加载模型
@@ -343,7 +345,7 @@ def main():
         unsupervised_gnn_model = AutoEncoder(input_size, hidden_size, output_size).to(device)
         # 定义损失函数和优化器
         criterion = nn.MSELoss()
-        optimizer = optim.Adam(unsupervised_gnn_model.parameters(), lr=0.01)
+        optimizer = optim.Adam(unsupervised_gnn_model.parameters(), lr=0.001)
 
         start_time = time.time()
         print("training start...")
@@ -354,23 +356,16 @@ def main():
         total_time = end_time - start_time
         print(f'Training done. Total time: {total_time:.2f} seconds')
 
-    print('representation[0]: ', representations[0])
-
-    latent_representations = generate_and_save_latent_representations(unsupervised_gnn_model, graphs, device, '/home/lig0d/compression/graphcom')
+    latent_representations = generate_and_save_latent_representations(unsupervised_gnn_model, graphs, device, '/home/lig0d/compression/graphcom/gnn/')
+    # latent_representations = generate_and_save_latent_representations_dat(unsupervised_gnn_model, graphs, device, '/home/lig0d/compression/graphcom/gnn/')
 
     reconstructed_graphs = reconstruct_graphs(unsupervised_gnn_model, normalized_graphs, device)
     denormalize_temperature(reconstructed_graphs, mean_temp, std_temp)
-    # with open(reconstructed_graphs_file_path, 'wb') as file:
-    #         pickle.dump(reconstructed_graphs, file)
+    with open(reconstructed_graphs_file_path, 'wb') as file:
+            pickle.dump(reconstructed_graphs, file)
     # consistency_results = compare_edge_consistency(graphs, reconstructed_graphs)
     view_graphs(graphs, reconstructed_graphs)
     # similarities = compare_graphs(graphs[0:3], reconstructed_graphs[0:3])
-
-    # # 比较原始图和重构图
-    # similarities = compare_graphs(graphs, reconstructed_graphs)
-    # for item in similarities:
-    #     print(item)
-    #     print()  # 添加一个换行符
 
     # 假设 'rag' 是你的图对象 len(graphs)
     for i in range(3):
@@ -383,13 +378,20 @@ def main():
 if __name__ == '__main__':
 
     total_size = 1038825 #1215
+
     num_timepoints = 500
     wide = 855
     length  = 1215
-    input_channel = 2
+
     epochs  = 100
+
+    scale = 100
+    sigma = 1
+    min_size = 1
+
     loss_type = "mse"
     model_version = 1
     os.environ["CUDA_VISIBLE_DEVICES"] = "3"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
     main()
