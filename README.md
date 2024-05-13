@@ -8,3 +8,6 @@ Run graph_representation_learning.py to obtain the model and laten representatio
 
 ## Step 3:
 Run graph2grid.py to reconstruct the grid data 
+
+# GAN generator model
+The source code of gan model and the generator model file
