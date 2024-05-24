@@ -4,7 +4,7 @@ from skimage import graph
 import numpy as np
 import networkx as nx
 import time
-import pickle
+import joblib
 
 def calculate_segments_fz(temperature_matrix, scale, sigma, min_size):
     temperature_matrix_float = img_as_float(temperature_matrix)
@@ -53,7 +53,7 @@ def main():
         # Save the graph to a file
         file_name = f"graph_scale{scale}_sigma{sigma}_minsize{min_size}_t1seg.pkl"
         with open(file_name, "wb") as file:
-            pickle.dump(rag, file)
+            joblib.dump(rag, file)
 
         print(f"Graph created and saved to {file_name} in {duration:.2f} seconds")
 
