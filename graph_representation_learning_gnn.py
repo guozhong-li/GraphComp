@@ -235,7 +235,7 @@ def main():
             graphs = joblib.load(file)
         print("load graphs done.")
     else:
-        temperature_data = np.fromfile('/path/to/your/data/', dtype=np.float32).reshape(wide, length, -1)
+        temperature_data = np.fromfile('/path/to/your/data/', dtype=np.float32).reshape(-1, wide, length)
         print("temperature_data.shape: ", temperature_data.shape)
 
         first_segments_fz = calculate_segments_fz(temperature_data[timestamp-1,:,:], scale=10, sigma=1, min_size=1)
@@ -244,7 +244,7 @@ def main():
 
         # Sort results by index to maintain original order
         results.sort(key=lambda x: x[0])
-        rag = [result[1] for result in results]
+        graphs = [result[1] for result in results]
         
         print("graph_initialization done.")
 

@@ -3,7 +3,7 @@ from skimage import graph
 from skimage.util import img_as_float
 import numpy as np
 import networkx as nx
-import matplotlib.pyplot as plt
+from multiprocessing import Pool, cpu_count
 
 import os
 import time
@@ -16,6 +16,11 @@ import torch.nn.functional as F
 from torch_geometric.data import Data
 from torch_geometric.nn import MessagePassing
 from torch_geometric.nn import GCNConv, BatchNorm
+
+def calculate_segments_fz(temperature_matrix, scale, sigma, min_size):
+    temperature_matrix_float = img_as_float(temperature_matrix)
+    segments_fz = felzenszwalb(temperature_matrix_float, scale=scale, sigma=sigma, min_size=min_size)
+    return segments_fz
 
 def graph_initialization(temperature_matrix):
     # Assuming temperature_matrix is your original data matrix
@@ -266,6 +271,9 @@ def compare_original_and_decoded(autoencoder, data, device, min_val, max_val):
         for orig, dec in zip(original_data[0], decoded_data[0]):
             print("{:<15} {:<15}".format(orig[0], dec[0]))
 
+def process_matrix(args):
+    index, matrix, first_segments_fz = args
+    return index, graph_initialization(matrix, first_segments_fz)
 
 def main():
     graphs_file_path = f"re_graph_scale{scale}_sigma{sigma}_minsize{min_size}_t1seg.pkl"
@@ -279,10 +287,17 @@ def main():
             graphs = joblib.load(file)
         print("load graphs done.")
     else:
-        temperature_data = np.fromfile('/path/to/your/data', dtype=np.float32).reshape(wide, length, -1)
+        temperature_data = np.fromfile('/path/to/your/data/', dtype=np.float32).reshape(-1, wide, length)
         print("temperature_data.shape: ", temperature_data.shape)
 
-        graphs = [graph_initialization(data_matrix) for data_matrix in temperature_data]
+        first_segments_fz = calculate_segments_fz(temperature_data[timestamp-1,:,:], scale=10, sigma=1, min_size=1)
+        with Pool(cpu_count()) as pool:
+            results = pool.map(process_matrix, [(i, matrix, first_segments_fz) for i, matrix in enumerate(temperature_data)])
+
+        # Sort results by index to maintain original order
+        results.sort(key=lambda x: x[0])
+        graphs = [result[1] for result in results]
+        
         print("graph_initialization done.")
 
         with open(graphs_file_path, 'wb') as file:
@@ -335,6 +350,8 @@ if __name__ == '__main__':
     scale = 500
     sigma = 1
     min_size = 1
+
+    timestamp = 1
 
     loss_type = "mse"
     model_version = 1

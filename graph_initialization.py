@@ -53,7 +53,7 @@ def main():
 
         # Sort results by index to maintain original order
         results.sort(key=lambda x: x[0])
-        rag = [result[1] for result in results]
+        graphs = [result[1] for result in results]
 
         end_time = time.time()  # End time
         duration = end_time - start_time  # Duration in seconds
@@ -61,7 +61,7 @@ def main():
         # Save the graph to a file
         file_name = f"graph_scale{scale}_sigma{sigma}_minsize{min_size}_t{timestamp}seg.pkl"
         with open(file_name, "wb") as file:
-            joblib.dump(rag, file)
+            joblib.dump(graphs, file)
 
         print(f"Graph created and saved to {file_name} in {duration:.2f} seconds")
 
