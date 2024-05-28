@@ -1,10 +1,10 @@
-from skimage import img_as_float
-from skimage.segmentation import felzenszwalb
-from skimage import graph
-import numpy as np
-import networkx as nx
 import time
 import joblib
+import numpy as np
+from skimage import graph
+from skimage import img_as_float
+from skimage.segmentation import felzenszwalb
+from multiprocessing import Pool, cpu_count
 
 def calculate_segments_fz(temperature_matrix, scale, sigma, min_size):
     temperature_matrix_float = img_as_float(temperature_matrix)
@@ -31,27 +31,36 @@ def graph_initialization(temperature_matrix, segments_fz):
 
     return rag
 
+def process_matrix(args):
+    index, matrix, first_segments_fz = args
+    return index, graph_initialization(matrix, first_segments_fz)
+
 def main():
     # Example temperature matrix (replace with your data)
     temperature_data = np.fromfile('/path/to/your/data', dtype=np.float32).reshape(num_timepoints, wide, length)
     print("temperature_data.shape: ", temperature_data.shape)
 
     # Different sets of parameters
-    parameters = [(100, 1, 1)]
+    parameters = [(10, 1, 1)]
 
-    first_segments_fz = calculate_segments_fz(temperature_data[0,:,:], scale=100, sigma=1, min_size=1)
+    first_segments_fz = calculate_segments_fz(temperature_data[timestamp-1,:,:], scale=10, sigma=1, min_size=1)
 
     # Iterate over each set of parameters
     for scale, sigma, min_size in parameters:
         start_time = time.time()  # Start time
 
-        rag = [graph_initialization(matrix, first_segments_fz) for matrix in temperature_data]
+        with Pool(cpu_count()) as pool:
+            results = pool.map(process_matrix, [(i, matrix, first_segments_fz) for i, matrix in enumerate(temperature_data)])
+
+        # Sort results by index to maintain original order
+        results.sort(key=lambda x: x[0])
+        rag = [result[1] for result in results]
 
         end_time = time.time()  # End time
         duration = end_time - start_time  # Duration in seconds
 
         # Save the graph to a file
-        file_name = f"graph_scale{scale}_sigma{sigma}_minsize{min_size}_t1seg.pkl"
+        file_name = f"graph_scale{scale}_sigma{sigma}_minsize{min_size}_t{timestamp}seg.pkl"
         with open(file_name, "wb") as file:
             joblib.dump(rag, file)
 
@@ -62,9 +71,11 @@ if __name__ == "__main__":
     wide = 855
     length  = 1215
 
-    scale = 100
+    scale = 10
     sigma = 1
     min_size = 1
+
+    timestamp = 1
 
     main()
 
