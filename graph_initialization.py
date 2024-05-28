@@ -43,7 +43,6 @@ def main():
     # Different sets of parameters
     parameters = [(10, 1, 1)]
 
-
     # Iterate over each set of parameters
     for scale, sigma, min_size in parameters:
         start_time = time.time()  # Start time
