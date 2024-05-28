@@ -1,14 +1,15 @@
-from skimage.segmentation import felzenszwalb
-from skimage import graph
-from skimage.util import img_as_float
-import numpy as np
-import networkx as nx
-import matplotlib.pyplot as plt
-
 import os
 import time
 import pickle
 import torch
+import numpy as np
+import networkx as nx
+from skimage import graph
+from skimage.segmentation import felzenszwalb
+from skimage.util import img_as_float
+from skimage.segmentation import felzenszwalb
+from multiprocessing import Pool, cpu_count
+
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
@@ -17,21 +18,22 @@ from torch_geometric.nn import MessagePassing
 from torch_geometric.nn import GCNConv, BatchNorm
 from torch_geometric.utils import to_networkx
 
+def calculate_segments_fz(temperature_matrix, scale, sigma, min_size):
+    temperature_matrix_float = img_as_float(temperature_matrix)
+    segments_fz = felzenszwalb(temperature_matrix_float, scale=scale, sigma=sigma, min_size=min_size)
+    return segments_fz
 
-def graph_initialization(temperature_matrix):
+def graph_initialization(temperature_matrix, segments_fz):
     # Assuming temperature_matrix is your original data matrix
-    temperature_matrix = img_as_float(temperature_matrix)
-
-    # Use felzenszwalb method for segmentation
-    segments_fz = felzenszwalb(temperature_matrix, scale=500, sigma=1, min_size=100)
+    temperature_matrix_float = img_as_float(temperature_matrix)
 
     # Create a Region Adjacency Graph using mean temperatures
-    rag = graph.rag_mean_color(temperature_matrix, segments_fz)
+    rag = graph.rag_mean_color(temperature_matrix_float, segments_fz)
 
     # Iterate over regions
     for region in np.unique(segments_fz):
         # Find the mean temperature of the region
-        region_pixels = temperature_matrix[segments_fz == region]
+        region_pixels = temperature_matrix_float[segments_fz == region]
         mean_temperature = np.mean(region_pixels)
         # std_temperature = np.std(region_pixels)
         
@@ -40,6 +42,10 @@ def graph_initialization(temperature_matrix):
         # rag.nodes[region]['std temperature'] = std_temperature
 
     return rag
+
+def process_matrix(args):
+    index, matrix, first_segments_fz = args
+    return index, graph_initialization(matrix, first_segments_fz)
 
 def calculate_mean_std(train_graphs):
     all_temperatures = [data['mean temperature'] for graph in train_graphs for _, data in graph.nodes(data=True)]
@@ -232,7 +238,14 @@ def main():
         temperature_data = np.fromfile('/path/to/your/data/', dtype=np.float32).reshape(wide, length, -1)
         print("temperature_data.shape: ", temperature_data.shape)
 
-        graphs = [graph_initialization(data_matrix) for data_matrix in temperature_data]
+        first_segments_fz = calculate_segments_fz(temperature_data[timestamp-1,:,:], scale=10, sigma=1, min_size=1)
+        with Pool(cpu_count()) as pool:
+            results = pool.map(process_matrix, [(i, matrix, first_segments_fz) for i, matrix in enumerate(temperature_data)])
+
+        # Sort results by index to maintain original order
+        results.sort(key=lambda x: x[0])
+        rag = [result[1] for result in results]
+        
         print("graph_initialization done.")
 
         with open(graphs_file_path, 'wb') as file:
@@ -283,6 +296,8 @@ if __name__ == '__main__':
     scale = 100
     sigma = 1
     min_size = 1
+
+    timestamp = 1
 
     loss_type = "mse"
     model_version = 1
