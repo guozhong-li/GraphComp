@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import os
 import time
 import random
-import pickle
+import joblib
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -238,7 +238,7 @@ def generate_and_save_graph_embedding(model, graphs, device, save_path):
 
     print("latent_representations.shape: ", latent_representations.shape)
     with open(f"{save_path}/rere_graph_s{scale}s{sigma}m{min_size}_latent_representations_t1seg.pkl", 'wb') as file:
-        pickle.dump(latent_representations, file)
+        joblib.dump(latent_representations, file)
 
     return latent_representations
 
@@ -276,7 +276,7 @@ def main():
 
     if os.path.exists(graphs_file_path):
         with open(graphs_file_path, 'rb') as file:
-            graphs = pickle.load(file)
+            graphs = joblib.load(file)
         print("load graphs done.")
     else:
         temperature_data = np.fromfile('/path/to/your/data', dtype=np.float32).reshape(wide, length, -1)
@@ -286,7 +286,7 @@ def main():
         print("graph_initialization done.")
 
         with open(graphs_file_path, 'wb') as file:
-            pickle.dump(graphs, file)
+            joblib.dump(graphs, file)
     
     mean_temp, std_temp = calculate_mean_std(graphs)
     normalized_graphs = normalize_temperature(graphs, mean_temp, std_temp)

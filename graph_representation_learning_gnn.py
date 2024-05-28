@@ -1,6 +1,6 @@
 import os
 import time
-import pickle
+import joblib
 import torch
 import numpy as np
 import networkx as nx
@@ -232,7 +232,7 @@ def main():
 
     if os.path.exists(graphs_file_path):
         with open(graphs_file_path, 'rb') as file:
-            graphs = pickle.load(file)
+            graphs = joblib.load(file)
         print("load graphs done.")
     else:
         temperature_data = np.fromfile('/path/to/your/data/', dtype=np.float32).reshape(wide, length, -1)
@@ -249,7 +249,7 @@ def main():
         print("graph_initialization done.")
 
         with open(graphs_file_path, 'wb') as file:
-            pickle.dump(graphs, file)
+            joblib.dump(graphs, file)
     
     mean_temp, std_temp = calculate_mean_std(graphs)
     normalized_graphs = normalize_temperature(graphs, mean_temp, std_temp)
@@ -281,7 +281,7 @@ def main():
     reconstructed_graphs = reconstruct_graphs(unsupervised_gnn_model, normalized_graphs, device)
     denormalize_temperature(reconstructed_graphs, mean_temp, std_temp)
     with open(reconstructed_graphs_file_path, 'wb') as file:
-            pickle.dump(reconstructed_graphs, file)
+            joblib.dump(reconstructed_graphs, file)
 
     view_graphs(graphs, reconstructed_graphs)
 
