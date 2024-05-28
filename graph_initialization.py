@@ -43,11 +43,11 @@ def main():
     # Different sets of parameters
     parameters = [(10, 1, 1)]
 
-    first_segments_fz = calculate_segments_fz(temperature_data[timestamp-1,:,:], scale=10, sigma=1, min_size=1)
 
     # Iterate over each set of parameters
     for scale, sigma, min_size in parameters:
         start_time = time.time()  # Start time
+        first_segments_fz = calculate_segments_fz(temperature_data[timestamp-1,:,:], scale, sigma, min_size)
 
         with Pool(cpu_count()) as pool:
             results = pool.map(process_matrix, [(i, matrix, first_segments_fz) for i, matrix in enumerate(temperature_data)])
