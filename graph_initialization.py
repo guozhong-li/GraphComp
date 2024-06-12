@@ -37,7 +37,7 @@ def process_matrix(args):
 
 def main():
     # Example temperature matrix (replace with your data)
-    temperature_data = np.fromfile('/path/to/your/data', dtype=np.float32).reshape(num_timepoints, wide, length)
+    temperature_data = np.fromfile('/path/to/your/data', dtype=np.float32).reshape(-1, wide, length)
     print("temperature_data.shape: ", temperature_data.shape)
 
     # Different sets of parameters
@@ -66,13 +66,8 @@ def main():
         print(f"Graph created and saved to {file_name} in {duration:.2f} seconds")
 
 if __name__ == "__main__":
-    num_timepoints = 500
-    wide = 855
-    length  = 1215
-
-    scale = 10
-    sigma = 1
-    min_size = 1
+    wide = 721
+    length  = 1440
 
     timestamp = 1
 
