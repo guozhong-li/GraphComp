@@ -3,11 +3,11 @@ from skimage.segmentation import felzenszwalb
 import numpy as np
 import networkx as nx
 import time
-import pickle
+import joblib
 import matplotlib.pyplot as plt
 import os
-from scipy.interpolate import Rbf
 from scipy.ndimage import gaussian_filter
+from multiprocessing import Pool, cpu_count
 
 def calculate_segments_fz(temperature_matrix, scale, sigma, min_size):
     temperature_matrix_float = img_as_float(temperature_matrix)
@@ -90,80 +90,51 @@ def graph_to_matrix_gaussian(rag, segments_fz, shape):
 
     return reconstructed_matrix
 
-def calculate_pixelwise_mae(original_matrix, reconstructed_matrix):
-    """
-    Calculate the pixel-wise Mean Absolute Error (MAE) between the original and reconstructed matrices.
-
-    :param original_matrix: The original temperature matrix.
-    :param reconstructed_matrix: The reconstructed temperature matrix.
-    :return: Array of pixel-wise MAE values.
-    """
-    # Ensure both matrices have the same shape
-    assert original_matrix.shape == reconstructed_matrix.shape, "Matrices must have the same shape."
-
-    # Calculate the pixel-wise MAE
-    pixelwise_mae = np.abs(original_matrix - reconstructed_matrix)
-    return pixelwise_mae
+def process_graph(data):
+    graph_data, first_segments_fz, common_shape = data
+    # Reconstruct the temperature matrix from the RAG
+    reconstructed_matrix = graph_to_matrix_wostd(graph_data, first_segments_fz, common_shape).astype(np.float32).flatten()
+    return reconstructed_matrix
 
 def main():
     # Example temperature matrix (replace with your data)
-    temperature_data = np.fromfile('/path/to/your/data', dtype=np.float32).reshape(num_timepoints, wide, length)
+    temperature_data = np.fromfile('/path/to/your/data', dtype=np.float32).reshape(-1, wide, length)
     print("temperature_data.shape: ", temperature_data.shape)
 
-    # graphs_file_path = 're_graph_scale500_sigma1_minsize'+str(min_size)+'.pkl' 
     graphs_file_path = f"graph_scale{scale}_sigma{sigma}_minsize{min_size}_t{timestamp}seg.pkl"
-    # segments_path = '/path/to/segments'  # Change to your segments directory path
     save_path = './'
     
     common_shape = (855, 1215)  # Common shape
-    reconstructed_matrices = []
+    parameters = [(1, 1, 1)]
 
-    first_segments_fz = calculate_segments_fz(img_as_float(temperature_data[0,:,:]), scale=100, sigma=1, min_size=min_size)
+    for scale, sigma, min_size in parameters:
+        print("scale: ", scale, "sigma: ", sigma, "min_size: ", min_size)
+        graphs_file_path = f"graph_scale{scale}_sigma{sigma}_minsize{min_size}_t{timestamp}seg.pkl"
+        
+        # segments_path = '/path/to/segments'  # Change to your segments directory path
+        first_segments_fz = calculate_segments_fz(img_as_float(temperature_data[timestamp-1,:,:]), scale=scale, sigma=sigma, min_size=min_size)
 
-    with open(graphs_file_path, 'rb') as file:
-            graphs = pickle.load(file)
-    print("load graphs done.")
+        with open(graphs_file_path, 'rb') as file:
+                graphs = joblib.load(file)
+        print("load graphs done.")
+        reconstructed_matrices = []  
+        start_time = time.time()  # Start time
 
-    for i, graph_data in enumerate(graphs):
+        with Pool(cpu_count()) as pool:
+            reconstructed_matrices = pool.map(process_graph, [(graph_data, first_segments_fz, common_shape) for graph_data in graphs])
 
-        # Reconstruct the temperature matrix from the RAG
-        reconstructed_matrix = graph_to_matrix_gaussian(graph_data, first_segments_fz, common_shape).astype(np.float32).flatten()
-        # reconstructed_matrix = graph_to_matrix_wostd(graph_data, first_segments_fz, common_shape).astype(np.float32).flatten()
-        reconstructed_matrices.append(reconstructed_matrix)
-
-    # Now, reconstructed_matrix is your approximated temperature matrix
-    np.save(os.path.join(save_path, f"re_redsea_s{scale}s{sigma}m{min_size}_{seg_method}{gaussian_sigma}_t{timestamp}seg.npy"), reconstructed_matrices)
+        end_time = time.time()  # End time
+        duration = end_time - start_time  # Duration in seconds
+        # Now, reconstructed_matrix is your approximated temperature matrix
+        np.save(os.path.join(save_path, f"re_era5_s{scale}s{sigma}m{min_size}_{seg_method}{gaussian_sigma}_t{timestamp}seg.npy"), reconstructed_matrices)
+        
+        print(f"reconstructed and saved  in {duration:.2f} seconds")
     
-    pixelwise_mae = calculate_pixelwise_mae(temperature_data, np.array(reconstructed_matrices).reshape(num_timepoints,855,1215))
-
-    # Calculate max, min, and distribution
-    max_mae = np.max(pixelwise_mae)
-    min_mae = np.min(pixelwise_mae)
-    mean_mae = np.mean(pixelwise_mae)
-    std_mae = np.std(pixelwise_mae)
-
-    print("Number of nodes:", len(graph_data.nodes))
-    print("Number of edges:", len(graph_data.edges))
-
-    print("Maximum MAE:", max_mae)
-    print("Minimum MAE:", min_mae)
-    print("Mean MAE:", mean_mae)
-    print("Standard Deviation of MAE:", std_mae)
-
-    plt.hist(pixelwise_mae.ravel(), bins=1000, color='blue', alpha=0.7)
-    plt.title("Distribution of Pixel-wise MAE")
-    plt.xlabel("MAE Value")
-    plt.ylabel("Frequency")
-    plt.savefig(f'The Distribution of Pixel-wise MAE-{min_size}_{seg_method}_{gaussian_sigma}.png')
 
 if __name__ == "__main__":
-    num_timepoints = 500
-    wide = 855
-    length  = 1215
 
-    scale = 100
-    sigma = 1
-    min_size = 1
+    wide = 721
+    length  = 1440
 
     timestamp = 0
 
@@ -172,6 +143,5 @@ if __name__ == "__main__":
 
     print('seg_method: ', seg_method, 'gaussian_sigma: ', gaussian_sigma)
     
-    print("scale: ", scale, "sigma: ", sigma, "min_size: ", min_size)
     main()
 
