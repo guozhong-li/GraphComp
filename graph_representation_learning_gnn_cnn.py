@@ -280,7 +280,6 @@ def main():
     model_path = f"auto_ggl_s{scale}_s{sigma}_m{min_size}_h1o1_t1seg.pkl"
     cnn_model_path = f"auto_cnn_s{scale}_s{sigma}_m{min_size}_e{epochs}_t1seg.pkl"
     cnn_latent_representation_save_path = f"auto_cnn_s{scale}_s{sigma}_m{min_size}_e{epochs}_latent_t1seg.dat"
-    reconstructed_graphs_file_path = f"re2_graph_scale{scale}_sigma{sigma}_minsize{min_size}_t1seg.pkl"
 
     if os.path.exists(graphs_file_path):
         with open(graphs_file_path, 'rb') as file:
@@ -341,13 +340,12 @@ def main():
     
 
 if __name__ == '__main__':
-    num_timepoints = 500
-    wide = 855
-    length  = 1215
+    wide = 721
+    length  = 1440
 
     epochs  = 100
 
-    scale = 500
+    scale = 10
     sigma = 1
     min_size = 1
 

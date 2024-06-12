@@ -287,13 +287,12 @@ def main():
 
 if __name__ == '__main__':
 
-    num_timepoints = 500
-    wide = 855
-    length  = 1215
+    wide = 721
+    length  = 1440
 
     epochs  = 100
 
-    scale = 100
+    scale = 10
     sigma = 1
     min_size = 1
 
