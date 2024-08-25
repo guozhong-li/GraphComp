@@ -1,5 +1,5 @@
 # GraphCom
-The code of GraphCom
+A novel graph representation-based method for error-bounded lossy compression of scientific data
 
 ## Setup
 Dependencies for this project can be installed by:
@@ -34,4 +34,6 @@ python error_bounded.py
 ```
 
 # GAN generator model
-The source code of gan model and the generator model file
+The source code of gan model and the generator model file.
+
+a WGAN model from our private Red Sea data to generate synthetic data with similar characteristics
