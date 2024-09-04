@@ -37,3 +37,9 @@ python error_bounded.py
 The source code of gan model and the generator model file.
 
 a WGAN model from our private Red Sea data to generate synthetic data with similar characteristics
+
+> Illustration of real and synthetic temperature data
+
+| real | synthetic |
+|---|---|
+| ![real](./figures/raw-t10.png) | ![synthetic](./figures/gan-t0.png) |
