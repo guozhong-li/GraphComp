@@ -43,3 +43,5 @@ a WGAN model from our private Red Sea data to generate synthetic data with simil
 | real | synthetic |
 |---|---|
 | ![real](./figures/raw-t10.png) | ![synthetic](./figures/gan-t0.png) |
+
+The synthetic Red Sea t2 data: https://shorturl.at/4Hek2
