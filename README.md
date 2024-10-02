@@ -1,4 +1,4 @@
-# GraphCom
+# GraphComp
 A novel graph representation-based method for error-bounded lossy compression of scientific data
 
 ## Setup
